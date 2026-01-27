@@ -22,12 +22,15 @@
   "homepage": "https://github.com/DelightGeorge/Lms_Backend#readme",
   "description": "",
   "dependencies": {
+    "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "pg": "^8.17.2"
   },
   "devDependencies": {
+    "@types/pg": "^8.16.0",
     "nodemon": "^3.1.11",
     "prisma": "^7.3.0"
   }

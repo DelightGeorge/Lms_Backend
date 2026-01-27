@@ -1,15 +1,305 @@
-// Define your database connection
-datasource db {
-  provider  = "postgresql"
-}
-
+// ================================
+// Prisma Client Generator
+// ================================
 generator client {
   provider = "prisma-client-js"
 }
 
+// ================================
+// Datasource
+// Prisma v7: connection handled via prisma.config.ts
+// ================================
+datasource db {
+  provider = "postgresql"
+}
+
+// ================================
+// ENUMS
+// ================================
+enum Role {
+  ADMIN
+  INSTRUCTOR
+  STUDENT
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum StudentLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum LessonType {
+  VIDEO
+  TEXT
+}
+
+enum NotificationType {
+  ENROLLMENT
+  COURSE_PUBLISHED
+  NEW_LESSON
+  QUIZ_RESULT
+  ACCOUNT
+}
+
+// ================================
+// USER
+// ================================
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
+  id       String @id @default(uuid())
+  email    String @unique
+  password String
+
+  // Profile
+  fullName  String
+  bio       String?
+  avatarUrl String?
+  phone     String?
+
+  role   Role
+  status AccountStatus @default(ACTIVE)
+
+  // Instructor-only
+  expertise       String?
+  yearsExperience Int?
+  isApproved      Boolean?
+
+  // Student-only
+  learningGoal String?
+  level        StudentLevel?
+
+  // Relations
+  courses       Course[]       @relation("InstructorCourses")
+  enrollments   Enrollment[]
+  progress      Progress[]
+  quizAttempts  QuizAttempt[]
+  notifications Notification[]
+  reviews       Review[]
+  notes         Note[]
+
+  createdAt DateTime @default(now())
+}
+
+// ================================
+// CATEGORY
+// ================================
+model Category {
+  id   String @id @default(uuid())
+  name String @unique
+
+  courses Course[]
+}
+
+// ================================
+// COURSE
+// ================================
+model Course {
+  id          String       @id @default(uuid())
+  title       String
+  description String
+  price       Float        @default(0)
+  status      CourseStatus @default(DRAFT)
+  thumbnail   String?
+
+  instructorId String
+  instructor   User   @relation("InstructorCourses", fields: [instructorId], references: [id])
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  lessons       Lesson[]
+  enrollments   Enrollment[]
+  quizzes       Quiz[]
+  reviews       Review[]
+  announcements Announcement[]
+  resources     Resource[]
+
+  createdAt DateTime @default(now())
+}
+
+// ================================
+// LESSON
+// ================================
+model Lesson {
+  id      String     @id @default(uuid())
+  title   String
+  content String
+  type    LessonType
+  order   Int
+
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id])
+
+  progress Progress[]
+  notes    Note[]
+
+  createdAt DateTime @default(now())
+}
+
+// ================================
+// ENROLLMENT
+// ================================
+model Enrollment {
+  id       String @id @default(uuid())
+  userId   String
+  courseId String
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  enrolledAt DateTime @default(now())
+
+  @@unique([userId, courseId])
+}
+
+// ================================
+// PROGRESS
+// ================================
+model Progress {
+  id        String  @id @default(uuid())
+  userId    String
+  lessonId  String
+  completed Boolean @default(false)
+
+  user   User   @relation(fields: [userId], references: [id])
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+
+  @@unique([userId, lessonId])
+}
+
+// ================================
+// QUIZ SYSTEM
+// ================================
+model Quiz {
+  id    String @id @default(uuid())
+  title String
+
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id])
+
+  questions Question[]
+
+  createdAt    DateTime      @default(now())
+  quizAttempts QuizAttempt[]
+}
+
+model Question {
+  id   String @id @default(uuid())
+  text String
+
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id])
+
+  options Option[]
+}
+
+model Option {
+  id        String  @id @default(uuid())
+  text      String
+  isCorrect Boolean @default(false)
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id])
+}
+
+model QuizAttempt {
+  id    String @id @default(uuid())
+  score Int
+
+  userId String
+  quizId String
+
+  user User @relation(fields: [userId], references: [id])
+  quiz Quiz @relation(fields: [quizId], references: [id])
+
+  attemptedAt DateTime @default(now())
+}
+
+// ================================
+// REVIEW
+// ================================
+model Review {
+  id      String  @id @default(uuid())
+  rating  Int
+  comment String?
+
+  userId   String
+  courseId String
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, courseId])
+}
+
+// ================================
+// ANNOUNCEMENT
+// ================================
+model Announcement {
+  id      String @id @default(uuid())
+  title   String
+  message String
+
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// ================================
+// RESOURCE
+// ================================
+model Resource {
+  id      String @id @default(uuid())
+  title   String
+  fileUrl String
+
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// ================================
+// NOTE
+// ================================
+model Note {
+  id      String @id @default(uuid())
+  content String
+
+  userId   String
+  lessonId String
+
+  user   User   @relation(fields: [userId], references: [id])
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// ================================
+// NOTIFICATION
+// ================================
+model Notification {
+  id      String           @id @default(uuid())
+  title   String
+  message String
+  type    NotificationType
+
+  isRead Boolean @default(false)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
   createdAt DateTime @default(now())
 }
