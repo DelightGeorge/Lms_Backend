@@ -7,12 +7,10 @@ generator client {
 
 // ================================
 // Datasource
-// Prisma v7: connection handled via prisma.config.ts
 // ================================
 datasource db {
   provider = "postgresql"
 }
-
 // ================================
 // ENUMS
 // ================================
@@ -35,7 +33,9 @@ enum StudentLevel {
 
 enum CourseStatus {
   DRAFT
+  PENDING_REVIEW
   PUBLISHED
+  REJECTED
 }
 
 enum LessonType {
@@ -46,6 +46,7 @@ enum LessonType {
 enum NotificationType {
   ENROLLMENT
   COURSE_PUBLISHED
+  COURSE_REJECTED
   NEW_LESSON
   QUIZ_RESULT
   ACCOUNT
@@ -69,9 +70,9 @@ model User {
   status AccountStatus @default(ACTIVE)
 
   // Instructor-only
-  expertise       String?
-  yearsExperience Int?
-  isApproved      Boolean?
+  expertise              String?
+  yearsExperience        Int?
+  isInstructorApproved   Boolean @default(false)
 
   // Student-only
   learningGoal String?
@@ -79,6 +80,7 @@ model User {
 
   // Relations
   courses       Course[]       @relation("InstructorCourses")
+  approvedCourses Course[]    @relation("AdminApprovedCourses")
   enrollments   Enrollment[]
   progress      Progress[]
   quizAttempts  QuizAttempt[]
@@ -111,7 +113,13 @@ model Course {
   thumbnail   String?
 
   instructorId String
-  instructor   User   @relation("InstructorCourses", fields: [instructorId], references: [id])
+  instructor   User @relation("InstructorCourses", fields: [instructorId], references: [id])
+
+  // Admin approval
+  approvedById String?
+  approvedBy   User?   @relation("AdminApprovedCourses", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+  rejectionReason String?
 
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])

@@ -1,20 +1,17 @@
-import express from "express";
-import cors from "cors";
-import "dotenv/config";
-import pg from "pg";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@prisma/client"; // Default location
+const express = require("express");
+const cors = require("cors");
+require("dotenv").config();
+
+const courseRoutes = require("./routes/courseRoutes");
+const prisma = require("./prisma");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Initialize PostgreSQL Connection
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-
-// Initialize Prisma with the adapter (REQUIRED in v7)
-const prisma = new PrismaClient({ adapter });
+// Routes
+app.use("/api/courses", courseRoutes);
 
 app.get("/", (req, res) => {
   res.json({ status: "OK", message: "LMS Backend is Live 🚀" });
