@@ -2,7 +2,6 @@ const { Pool } = require('pg');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { PrismaClient } = require('@prisma/client');
 
-// Use the URL from your .env
 const connectionString = process.env.DATABASE_URL;
 
 const pool = new Pool({ connectionString });

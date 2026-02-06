@@ -1,8 +1,9 @@
 // src/middlewares/authmiddleware.js
-const authMiddleware = (roles = []) => {
+const authorizeRoles = (roles = []) => {
   return (req, res, next) => {
-    // Example: req.user is set after login
-    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
     if (roles.length && !roles.includes(req.user.role)) {
       return res.status(403).json({ message: "Forbidden" });
@@ -12,4 +13,4 @@ const authMiddleware = (roles = []) => {
   };
 };
 
-module.exports = authMiddleware;
+module.exports = authorizeRoles;

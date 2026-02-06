@@ -3,7 +3,9 @@ const cors = require("cors");
 require("dotenv").config();
 
 const courseRoutes = require("./routes/courseRoutes");
+const authRoutes = require("./routes/authRoutes");
 const prisma = require("./prisma");
+const userRoutes = require("./routes/userRoutes");
 
 const app = express();
 app.use(cors());
@@ -12,6 +14,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use("/api/courses", courseRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+
 
 app.get("/", (req, res) => {
   res.json({ status: "OK", message: "LMS Backend is Live 🚀" });

@@ -2,7 +2,8 @@
 // Prisma Client Generator
 // ================================
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 // ================================
@@ -10,7 +11,9 @@ generator client {
 // ================================
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
+
 // ================================
 // ENUMS
 // ================================
@@ -69,24 +72,27 @@ model User {
   role   Role
   status AccountStatus @default(ACTIVE)
 
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
+
   // Instructor-only
-  expertise              String?
-  yearsExperience        Int?
-  isInstructorApproved   Boolean @default(false)
+  expertise            String?
+  yearsExperience      Int?
+  isInstructorApproved Boolean @default(false)
 
   // Student-only
   learningGoal String?
   level        StudentLevel?
 
   // Relations
-  courses       Course[]       @relation("InstructorCourses")
-  approvedCourses Course[]    @relation("AdminApprovedCourses")
-  enrollments   Enrollment[]
-  progress      Progress[]
-  quizAttempts  QuizAttempt[]
-  notifications Notification[]
-  reviews       Review[]
-  notes         Note[]
+  courses         Course[]       @relation("InstructorCourses")
+  approvedCourses Course[]       @relation("AdminApprovedCourses")
+  enrollments     Enrollment[]
+  progress        Progress[]
+  quizAttempts    QuizAttempt[]
+  notifications   Notification[]
+  reviews         Review[]
+  notes           Note[]
 
   createdAt DateTime @default(now())
 }
@@ -113,12 +119,12 @@ model Course {
   thumbnail   String?
 
   instructorId String
-  instructor   User @relation("InstructorCourses", fields: [instructorId], references: [id])
+  instructor   User   @relation("InstructorCourses", fields: [instructorId], references: [id])
 
   // Admin approval
-  approvedById String?
-  approvedBy   User?   @relation("AdminApprovedCourses", fields: [approvedById], references: [id])
-  approvedAt   DateTime?
+  approvedById    String?
+  approvedBy      User?     @relation("AdminApprovedCourses", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
   rejectionReason String?
 
   categoryId String?
