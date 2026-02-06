@@ -149,3 +149,27 @@ exports.getCourseById = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch course details" });
   }
 };
+
+// ===================== SUBMIT COURSE (Instructor) =====================
+exports.submitCourse = async (req, res) => {
+  try {
+    const courseId = req.params.id;
+    const userId = req.user.id;
+
+    const course = await prisma.course.findUnique({ where: { id: courseId } });
+    if (!course) return res.status(404).json({ message: "Course not found" });
+    if (course.instructorId !== userId)
+      return res.status(403).json({ message: "Not authorized" });
+
+    await prisma.course.update({
+      where: { id: courseId },
+      data: { status: "PENDING_REVIEW" },
+    });
+
+    res.status(200).json({ message: "Course submitted for admin review" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to submit course" });
+  }
+};
+

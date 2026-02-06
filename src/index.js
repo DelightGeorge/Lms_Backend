@@ -6,6 +6,14 @@ const courseRoutes = require("./routes/courseRoutes");
 const authRoutes = require("./routes/authRoutes");
 const prisma = require("./prisma");
 const userRoutes = require("./routes/userRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const lessonRoutes = require("./routes/lessonRoutes");
+const quizRoutes = require("./routes/quizRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
+const resourceRoutes = require("./routes/resourceRoutes");
+
 
 const app = express();
 app.use(cors());
@@ -16,6 +24,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/courses", courseRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/lessons", lessonRoutes);
+app.use("/api/quizzes", quizRoutes);
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/resources", resourceRoutes);
 
 
 app.get("/", (req, res) => {

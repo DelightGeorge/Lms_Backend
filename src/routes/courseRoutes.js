@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { createCourse, updateCourse, approveCourse, getAllCourses, getCourseById } = require("../controllers/courseController");
+const { createCourse, updateCourse, approveCourse, getAllCourses, getCourseById, submitCourse } = require("../controllers/courseController");
 const protect = require("../middlewares/auth");
 
 // Instructor creates course
@@ -15,5 +15,8 @@ router.patch("/approve/:id", protect, approveCourse);
 // Public routes
 router.get("/", getAllCourses);
 router.get("/:id", getCourseById);
+
+router.patch("/:id/submit", protect, submitCourse);
+
 
 module.exports = router;
