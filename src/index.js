@@ -2,9 +2,11 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
+const prisma = require("./prisma");
+
+// Routes
 const courseRoutes = require("./routes/courseRoutes");
 const authRoutes = require("./routes/authRoutes");
-const prisma = require("./prisma");
 const userRoutes = require("./routes/userRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const adminRoutes = require("./routes/adminRoutes");
@@ -13,14 +15,23 @@ const lessonRoutes = require("./routes/lessonRoutes");
 const quizRoutes = require("./routes/quizRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const resourceRoutes = require("./routes/resourceRoutes");
-
+const cartRoutes = require("./routes/cartRoutes");
 
 const app = express();
-app.use(cors());
+
+// 1️⃣ Proper CORS setup
+const corsOptions = {
+  origin: "http://localhost:5173", // frontend URL
+  credentials: true,               // allow cookies / Authorization headers
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+};
+app.use(cors(corsOptions));
+
+// 2️⃣ Middleware to parse requests
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
+// 3️⃣ Routes
 app.use("/api/courses", courseRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -31,8 +42,9 @@ app.use("/api/lessons", lessonRoutes);
 app.use("/api/quizzes", quizRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/resources", resourceRoutes);
+app.use("/api/cart", cartRoutes);
 
-
+// 4️⃣ Test endpoints
 app.get("/", (req, res) => {
   res.json({ status: "OK", message: "LMS Backend is Live 🚀" });
 });
@@ -46,5 +58,6 @@ app.get("/test-db", async (req, res) => {
   }
 });
 
+// 5️⃣ Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running at port ${PORT}`));

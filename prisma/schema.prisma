@@ -95,6 +95,7 @@ model User {
   notes           Note[]
 
   createdAt DateTime @default(now())
+  cart      Cart?
 }
 
 // ================================
@@ -137,7 +138,8 @@ model Course {
   announcements Announcement[]
   resources     Resource[]
 
-  createdAt DateTime @default(now())
+  createdAt DateTime   @default(now())
+  cartItems CartItem[]
 }
 
 // ================================
@@ -316,4 +318,24 @@ model Notification {
   user   User   @relation(fields: [userId], references: [id])
 
   createdAt DateTime @default(now())
+}
+
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id])
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+}
+
+model CartItem {
+  id       String @id @default(uuid())
+  cartId   String
+  courseId String
+  quantity Int    @default(1)
+
+  cart   Cart   @relation(fields: [cartId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@unique([cartId, courseId])
 }
