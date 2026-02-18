@@ -72,6 +72,11 @@ model User {
   role   Role
   status AccountStatus @default(ACTIVE)
 
+  // ✅ EMAIL VERIFICATION
+  isEmailVerified        Boolean   @default(false)
+  emailVerificationToken String? // <-- add this
+  emailVerifyExpires     DateTime?
+
   resetPasswordToken   String?
   resetPasswordExpires DateTime?
 
@@ -120,11 +125,11 @@ model Course {
   thumbnail   String?
 
   instructorId String
-  instructor   User   @relation("InstructorCourses", fields: [instructorId], references: [id])
+  instructor   User   @relation("InstructorCourses", fields: [instructorId], references: [id], onDelete: Cascade)
 
   // Admin approval
   approvedById    String?
-  approvedBy      User?     @relation("AdminApprovedCourses", fields: [approvedById], references: [id])
+  approvedBy      User?     @relation("AdminApprovedCourses", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedAt      DateTime?
   rejectionReason String?
 
