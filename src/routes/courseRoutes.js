@@ -2,15 +2,17 @@ const express = require("express");
 const router = express.Router();
 const {
   createCourse, updateCourse, approveCourse,
-  getAllCourses, getCourseById, submitCourse
+  getAllCourses, getCourseById, submitCourse,
+  getInstructorCourses,
 } = require("../controllers/courseController");
 const protect = require("../middlewares/auth");
 
-// ── specific routes FIRST ──
+// ── specific routes FIRST (before /:id) ──
+router.get("/instructor/my-courses", protect, getInstructorCourses);
 router.post("/", protect, createCourse);
 router.get("/", getAllCourses);
-router.patch("/approve/:id", protect, approveCourse); // ← must be before /:id
-router.patch("/:id/submit", protect, submitCourse);   // ← must be before /:id
+router.patch("/approve/:id", protect, approveCourse);
+router.patch("/:id/submit", protect, submitCourse);
 
 // ── dynamic routes LAST ──
 router.get("/:id", getCourseById);

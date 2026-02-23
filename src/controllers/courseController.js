@@ -173,3 +173,21 @@ exports.submitCourse = async (req, res) => {
   }
 };
 
+// ===================== GET INSTRUCTOR'S OWN COURSES =====================
+exports.getInstructorCourses = async (req, res) => {
+  try {
+    const courses = await prisma.course.findMany({
+      where: { instructorId: req.user.id },
+      include: {
+        category: true,
+        _count: { select: { enrollments: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    res.status(200).json(courses);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch courses" });
+  }
+};
+
