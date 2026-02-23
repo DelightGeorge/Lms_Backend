@@ -19,11 +19,13 @@ const cartRoutes = require("./routes/cartRoutes");
 
 const app = express();
 
-// 1️⃣ Proper CORS setup
 const corsOptions = {
-  origin: "http://localhost:5173",
+  origin: [
+    "http://localhost:5173",
+    "https://lms-frontend-phi-khaki.vercel.app", // ← your actual Vercel URL
+  ],
   credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], // ← added PATCH
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 };
 app.use(cors(corsOptions));
 
