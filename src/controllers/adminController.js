@@ -5,7 +5,9 @@ const prisma = require("../prisma");
 exports.reviewCourse = async (req, res) => {
   try {
     if (req.user.role !== "ADMIN") {
-      return res.status(403).json({ message: "Only admins can review courses" });
+      return res
+        .status(403)
+        .json({ message: "Only admins can review courses" });
     }
 
     const courseId = req.params.id;
@@ -24,7 +26,9 @@ exports.reviewCourse = async (req, res) => {
         status: approve ? "PUBLISHED" : "REJECTED",
         approvedById: req.user.id,
         approvedAt: approve ? new Date() : null,
-        rejectionReason: approve ? null : rejectionReason || "No reason provided",
+        rejectionReason: approve
+          ? null
+          : rejectionReason || "No reason provided",
       },
     });
 
@@ -72,5 +76,74 @@ exports.getPendingCourses = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to fetch pending courses" });
+  }
+};
+
+// ===================== GET STATS =====================
+exports.getStats = async (req, res) => {
+  try {
+    if (req.user.role !== "ADMIN") {
+      return res.status(403).json({ message: "Admins only" });
+    }
+
+    const [totalUsers, totalCourses, pendingCourses, publishedCourses] =
+      await Promise.all([
+        prisma.user.count(),
+        prisma.course.count(),
+        prisma.course.count({ where: { status: "PENDING_REVIEW" } }),
+        prisma.course.count({ where: { status: "PUBLISHED" } }),
+      ]);
+
+    res.status(200).json({
+      totalUsers,
+      totalCourses,
+      pendingCourses,
+      publishedCourses,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch stats" });
+  }
+};
+
+// ===================== GET ALL USERS =====================
+exports.getAllUsers = async (req, res) => {
+  try {
+    if (req.user.role !== "ADMIN") {
+      return res.status(403).json({ message: "Admins only" });
+    }
+
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        role: true,
+        isEmailVerified: true,
+        createdAt: true,
+        avatarUrl: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.status(200).json(users);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch users" });
+  }
+};
+
+// ===================== DELETE USER =====================
+exports.deleteUser = async (req, res) => {
+  try {
+    if (req.user.role !== "ADMIN") {
+      return res.status(403).json({ message: "Admins only" });
+    }
+
+    await prisma.user.delete({ where: { id: req.params.id } });
+    res.status(200).json({ message: "User deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to delete user" });
   }
 };
