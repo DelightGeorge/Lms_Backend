@@ -130,19 +130,18 @@ exports.getAllCourses = async (req, res) => {
 // ===================== GET COURSE DETAIL =====================
 exports.getCourseById = async (req, res) => {
   try {
-    const courseId = req.params.id;
-
     const course = await prisma.course.findUnique({
-      where: { id: courseId },
+      where: { id: req.params.id },
       include: {
-        instructor: { select: { id: true, fullName: true, email: true } },
+        instructor: {
+          select: { id: true, fullName: true, email: true, avatarUrl: true },
+        },
         category: true,
-        lessons: true,
+        lessons: { orderBy: { order: "asc" } },
+        _count: { select: { enrollments: true } },
       },
     });
-
     if (!course) return res.status(404).json({ message: "Course not found" });
-
     res.status(200).json(course);
   } catch (err) {
     console.error(err);
@@ -190,4 +189,3 @@ exports.getInstructorCourses = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch courses" });
   }
 };
-
