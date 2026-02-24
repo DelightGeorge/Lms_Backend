@@ -45,11 +45,8 @@ exports.updateCourse = async (req, res) => {
     const course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) return res.status(404).json({ message: "Course not found" });
 
-    // Only instructor of course or admin can update
     if (req.user.role === "INSTRUCTOR" && course.instructorId !== userId) {
-      return res
-        .status(403)
-        .json({ message: "You are not allowed to update this course" });
+      return res.status(403).json({ message: "You are not allowed to update this course" });
     }
 
     const updatedCourse = await prisma.course.update({
@@ -59,14 +56,12 @@ exports.updateCourse = async (req, res) => {
         description,
         price,
         categoryId,
-        thumbnail,
-        status: req.user.role === "ADMIN" ? "PUBLISHED" : "PENDING_REVIEW", // instructor update → pending review
+        thumbnail,  // ← accepts Cloudinary URL
+        status: req.user.role === "ADMIN" ? "PUBLISHED" : "PENDING_REVIEW",
       },
     });
 
-    res
-      .status(200)
-      .json({ message: "Course updated successfully", course: updatedCourse });
+    res.status(200).json({ message: "Course updated successfully", course: updatedCourse });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to update course" });
