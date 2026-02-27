@@ -1,4 +1,6 @@
-const prisma = require("../prisma");
+// src/controllers/lessonController.js
+const prisma     = require("../prisma");
+const { notify } = require("../utils/notificationHelper");
 
 // ===================== CREATE LESSON =====================
 exports.createLesson = async (req, res) => {
@@ -7,29 +9,41 @@ exports.createLesson = async (req, res) => {
     const userId = req.user.id;
 
     if (!courseId || !title || !type) {
-      return res
-        .status(400)
-        .json({ message: "Course, title, and type are required" });
+      return res.status(400).json({ message: "Course, title, and type are required" });
     }
 
     const course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) return res.status(404).json({ message: "Course not found" });
 
     if (req.user.role !== "INSTRUCTOR" || course.instructorId !== userId) {
-      return res
-        .status(403)
-        .json({ message: "You cannot add lessons to this course" });
+      return res.status(403).json({ message: "You cannot add lessons to this course" });
     }
 
     const lesson = await prisma.lesson.create({
       data: {
         courseId,
         title,
-        content: videoUrl || content || "", // store videoUrl in content for VIDEO type
+        content: videoUrl || content || "",
         type,
         order: order || 1,
       },
     });
+
+    // ── Notify all enrolled students ──────────────────────────
+    // Only notify if course is published (no point notifying on draft courses)
+    if (course.status === "PUBLISHED") {
+      const enrollments = await prisma.enrollment.findMany({
+        where: { courseId },
+      });
+      for (const e of enrollments) {
+        await notify({
+          userId:  e.userId,
+          title:   "📖 New Lesson Available",
+          message: `A new ${type === "VIDEO" ? "video" : "text"} lesson "${title}" has been added to "${course.title}". Check it out!`,
+          type:    "GENERAL",
+        });
+      }
+    }
 
     res.status(201).json({ message: "Lesson created", lesson });
   } catch (err) {
@@ -47,9 +61,7 @@ exports.updateLesson = async (req, res) => {
     const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
     if (!lesson) return res.status(404).json({ message: "Lesson not found" });
 
-    const course = await prisma.course.findUnique({
-      where: { id: lesson.courseId },
-    });
+    const course = await prisma.course.findUnique({ where: { id: lesson.courseId } });
     if (req.user.role !== "INSTRUCTOR" || course.instructorId !== req.user.id) {
       return res.status(403).json({ message: "You cannot edit this lesson" });
     }
@@ -57,10 +69,10 @@ exports.updateLesson = async (req, res) => {
     const updatedLesson = await prisma.lesson.update({
       where: { id: lessonId },
       data: {
-        title,
+        title:   title   ?? lesson.title,
         content: videoUrl || content || lesson.content,
-        type,
-        order,
+        type:    type    ?? lesson.type,
+        order:   order   ?? lesson.order,
       },
     });
 
@@ -75,17 +87,17 @@ exports.updateLesson = async (req, res) => {
 exports.deleteLesson = async (req, res) => {
   try {
     const lessonId = req.params.id;
+
     const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
     if (!lesson) return res.status(404).json({ message: "Lesson not found" });
 
-    const course = await prisma.course.findUnique({
-      where: { id: lesson.courseId },
-    });
+    const course = await prisma.course.findUnique({ where: { id: lesson.courseId } });
     if (req.user.role !== "INSTRUCTOR" || course.instructorId !== req.user.id) {
       return res.status(403).json({ message: "You cannot delete this lesson" });
     }
 
     await prisma.lesson.delete({ where: { id: lessonId } });
+
     res.status(200).json({ message: "Lesson deleted" });
   } catch (err) {
     console.error(err);
@@ -96,9 +108,9 @@ exports.deleteLesson = async (req, res) => {
 // ===================== GET LESSONS BY COURSE =====================
 exports.getLessonsByCourse = async (req, res) => {
   try {
-    const courseId = req.params.courseId;
+    const { courseId } = req.params;
     const lessons = await prisma.lesson.findMany({
-      where: { courseId },
+      where:   { courseId },
       orderBy: { order: "asc" },
     });
     res.status(200).json(lessons);
