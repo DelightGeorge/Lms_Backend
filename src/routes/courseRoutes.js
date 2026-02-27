@@ -1,25 +1,32 @@
+// src/routes/courseRoutes.js
 const express = require("express");
-const router = express.Router();
+const router  = express.Router();
 const {
   createCourse,
   updateCourse,
+  deleteCourse,
   approveCourse,
   getAllCourses,
   getCourseById,
   submitCourse,
-  getInstructorCourses,  // ← add this
+  getInstructorCourses,
 } = require("../controllers/courseController");
 const protect = require("../middlewares/auth");
 
-// ── specific routes FIRST ──
-router.get("/instructor/my-courses", protect, getInstructorCourses); // ← must be before /:id
-router.post("/", protect, createCourse);
-router.get("/", getAllCourses);
-router.patch("/approve/:id", protect, approveCourse);
-router.patch("/:id/submit", protect, submitCourse);
+// ── specific named routes FIRST (must be before /:id) ─────
+router.get("/instructor/my-courses", protect, getInstructorCourses);
 
-// ── dynamic routes LAST ──
-router.get("/:id", getCourseById);
-router.patch("/:id", protect, updateCourse);
+// ── collection routes ──────────────────────────────────────
+router.get("/",  getAllCourses);
+router.post("/", protect, createCourse);
+
+// ── approval route ─────────────────────────────────────────
+router.patch("/approve/:id", protect, approveCourse);
+
+// ── dynamic id routes LAST ─────────────────────────────────
+router.get("/:id",           getCourseById);
+router.patch("/:id",         protect, updateCourse);
+router.delete("/:id",        protect, deleteCourse);      // ← was missing
+router.patch("/:id/submit",  protect, submitCourse);
 
 module.exports = router;

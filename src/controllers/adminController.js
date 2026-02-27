@@ -1,6 +1,8 @@
-const prisma = require("../prisma");
+// src/controllers/adminController.js
+const prisma     = require("../prisma");
+const { notify } = require("../utils/notificationHelper");
 
-// ── helper: admin guard ───────────────────────────
+// ── admin guard ───────────────────────────────────────────
 const adminOnly = (req, res) => {
   if (req.user.role !== "ADMIN") {
     res.status(403).json({ message: "Admins only" });
@@ -15,8 +17,8 @@ exports.getStats = async (req, res) => {
     if (!adminOnly(req, res)) return;
 
     const [
-      totalUsers, totalCourses, pendingCourses, publishedCourses,
-      totalEnrollments, revenueData,
+      totalUsers, totalCourses, pendingCourses,
+      publishedCourses, totalEnrollments, revenueData,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.course.count(),
@@ -45,7 +47,6 @@ exports.getAnalytics = async (req, res) => {
   try {
     if (!adminOnly(req, res)) return;
 
-    // Last 6 months labels
     const months = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date();
@@ -53,68 +54,52 @@ exports.getAnalytics = async (req, res) => {
       months.push({ label: d.toLocaleString("default", { month: "short" }), year: d.getFullYear(), month: d.getMonth() });
     }
 
-    // Enrollments per month
     const enrollments = await prisma.enrollment.findMany({
-      where: { enrolledAt: { gte: new Date(new Date().setMonth(new Date().getMonth() - 5)) } },
+      where:  { enrolledAt: { gte: new Date(new Date().setMonth(new Date().getMonth() - 5)) } },
       select: { enrolledAt: true, course: { select: { price: true } } },
     });
 
     const enrollmentsByMonth = months.map((m) => ({
-      month: m.label,
-      count: enrollments.filter((e) => {
-        const d = new Date(e.enrolledAt);
-        return d.getMonth() === m.month && d.getFullYear() === m.year;
-      }).length,
-      revenue: enrollments.filter((e) => {
-        const d = new Date(e.enrolledAt);
-        return d.getMonth() === m.month && d.getFullYear() === m.year;
-      }).reduce((acc, e) => acc + (e.course?.price || 0), 0),
+      month:   m.label,
+      count:   enrollments.filter((e) => { const d = new Date(e.enrolledAt); return d.getMonth() === m.month && d.getFullYear() === m.year; }).length,
+      revenue: enrollments.filter((e) => { const d = new Date(e.enrolledAt); return d.getMonth() === m.month && d.getFullYear() === m.year; })
+                          .reduce((acc, e) => acc + (e.course?.price || 0), 0),
     }));
 
-    // User growth per month
     const users = await prisma.user.findMany({
-      where: { createdAt: { gte: new Date(new Date().setMonth(new Date().getMonth() - 5)) } },
+      where:  { createdAt: { gte: new Date(new Date().setMonth(new Date().getMonth() - 5)) } },
       select: { createdAt: true },
     });
 
     const usersByMonth = months.map((m) => ({
       month: m.label,
-      count: users.filter((u) => {
-        const d = new Date(u.createdAt);
-        return d.getMonth() === m.month && d.getFullYear() === m.year;
-      }).length,
+      count: users.filter((u) => { const d = new Date(u.createdAt); return d.getMonth() === m.month && d.getFullYear() === m.year; }).length,
     }));
 
-    // Top performing courses
     const topCourses = await prisma.course.findMany({
-      where: { status: "PUBLISHED" },
+      where:   { status: "PUBLISHED" },
       include: {
         instructor: { select: { fullName: true } },
-        _count: { select: { enrollments: true } },
+        _count:     { select: { enrollments: true } },
       },
       orderBy: { enrollments: { _count: "desc" } },
-      take: 5,
+      take:    5,
     });
 
-    // Most active instructors
     const instructors = await prisma.user.findMany({
-      where: { role: "INSTRUCTOR" },
-      include: {
-        courses: {
-          include: { _count: { select: { enrollments: true } } },
-        },
-      },
+      where:   { role: "INSTRUCTOR" },
+      include: { courses: { include: { _count: { select: { enrollments: true } } } } },
     });
 
     const topInstructors = instructors
       .map((i) => ({
-        id: i.id,
-        fullName: i.fullName,
-        email: i.email,
-        avatarUrl: i.avatarUrl,
-        courseCount: i.courses.length,
+        id:            i.id,
+        fullName:      i.fullName,
+        email:         i.email,
+        avatarUrl:     i.avatarUrl,
+        courseCount:   i.courses.length,
         totalStudents: i.courses.reduce((acc, c) => acc + (c._count?.enrollments || 0), 0),
-        totalRevenue: i.courses.reduce((acc, c) => acc + ((c.price || 0) * (c._count?.enrollments || 0)), 0),
+        totalRevenue:  i.courses.reduce((acc, c) => acc + ((c.price || 0) * (c._count?.enrollments || 0)), 0),
       }))
       .sort((a, b) => b.totalStudents - a.totalStudents)
       .slice(0, 5);
@@ -123,12 +108,12 @@ exports.getAnalytics = async (req, res) => {
       enrollmentsByMonth,
       usersByMonth,
       topCourses: topCourses.map((c) => ({
-        id: c.id,
-        title: c.title,
-        instructor: c.instructor?.fullName,
+        id:          c.id,
+        title:       c.title,
+        instructor:  c.instructor?.fullName,
         enrollments: c._count?.enrollments || 0,
-        revenue: (c.price || 0) * (c._count?.enrollments || 0),
-        price: c.price,
+        revenue:     (c.price || 0) * (c._count?.enrollments || 0),
+        price:       c.price,
       })),
       topInstructors,
     });
@@ -138,19 +123,19 @@ exports.getAnalytics = async (req, res) => {
   }
 };
 
-// ===================== GET ALL PENDING COURSES =====================
+// ===================== GET PENDING COURSES =====================
 exports.getPendingCourses = async (req, res) => {
   try {
     if (!adminOnly(req, res)) return;
-    const pendingCourses = await prisma.course.findMany({
-      where: { status: "PENDING_REVIEW" },
+    const courses = await prisma.course.findMany({
+      where:   { status: "PENDING_REVIEW" },
       include: {
         instructor: { select: { id: true, fullName: true, email: true, avatarUrl: true } },
-        category: true,
-        _count: { select: { lessons: true, enrollments: true } },
+        category:   true,
+        _count:     { select: { lessons: true, enrollments: true } },
       },
     });
-    res.status(200).json(pendingCourses);
+    res.status(200).json(courses);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to fetch pending courses" });
@@ -164,8 +149,8 @@ exports.getAllCourses = async (req, res) => {
     const courses = await prisma.course.findMany({
       include: {
         instructor: { select: { id: true, fullName: true, email: true } },
-        category: true,
-        _count: { select: { lessons: true, enrollments: true } },
+        category:   true,
+        _count:     { select: { lessons: true, enrollments: true } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -176,22 +161,22 @@ exports.getAllCourses = async (req, res) => {
   }
 };
 
-// ===================== GET COURSE DETAIL (Admin) =====================
+// ===================== GET COURSE DETAIL =====================
 exports.getCourseDetail = async (req, res) => {
   try {
     if (!adminOnly(req, res)) return;
     const course = await prisma.course.findUnique({
-      where: { id: req.params.id },
+      where:   { id: req.params.id },
       include: {
-        instructor: { select: { id: true, fullName: true, email: true, avatarUrl: true } },
-        category: true,
-        lessons: { orderBy: { order: "asc" } },
+        instructor:  { select: { id: true, fullName: true, email: true, avatarUrl: true } },
+        category:    true,
+        lessons:     { orderBy: { order: "asc" } },
+        resources:   true,
         enrollments: {
           include: { user: { select: { id: true, fullName: true, email: true, avatarUrl: true } } },
           orderBy: { enrolledAt: "desc" },
-          take: 20,
+          take:    20,
         },
-        resources: true,
         _count: { select: { lessons: true, enrollments: true, reviews: true } },
       },
     });
@@ -207,34 +192,66 @@ exports.getCourseDetail = async (req, res) => {
 exports.reviewCourse = async (req, res) => {
   try {
     if (!adminOnly(req, res)) return;
+
     const courseId = req.params.id;
     const { approve, rejectionReason } = req.body;
 
-    const course = await prisma.course.findUnique({ where: { id: courseId }, include: { instructor: true } });
+    const course = await prisma.course.findUnique({
+      where:   { id: courseId },
+      include: { instructor: true },
+    });
     if (!course) return res.status(404).json({ message: "Course not found" });
 
     const updatedCourse = await prisma.course.update({
       where: { id: courseId },
-      data: {
-        status: approve ? "PUBLISHED" : "REJECTED",
-        approvedById: req.user.id,
-        approvedAt: approve ? new Date() : null,
-        rejectionReason: approve ? null : rejectionReason || "No reason provided",
+      data:  {
+        status:          approve ? "PUBLISHED" : "REJECTED",
+        approvedById:    req.user.id,
+        approvedAt:      approve ? new Date() : null,
+        rejectionReason: approve ? null : (rejectionReason || "No reason provided"),
       },
     });
 
-    await prisma.notification.create({
-      data: {
-        title: approve ? "Course Approved" : "Course Rejected",
-        message: approve
-          ? `Your course "${course.title}" has been approved and published!`
-          : `Your course "${course.title}" was rejected. Reason: ${updatedCourse.rejectionReason}`,
-        type: "COURSE_PUBLISHED",
-        userId: course.instructorId,
-      },
+    // ── Notify instructor ─────────────────────────────────────
+    await notify({
+      userId:  course.instructorId,
+      title:   approve ? "🎉 Course Approved & Published!" : "❌ Course Needs Revision",
+      message: approve
+        ? `Your course "${course.title}" has been reviewed and is now live on the platform. Students can start enrolling!`
+        : `Your course "${course.title}" was not approved. Reason: ${rejectionReason || "No reason provided"}. Please revise and resubmit.`,
+      type:    approve ? "COURSE_APPROVED" : "COURSE_REJECTED",
     });
 
-    res.status(200).json({ message: approve ? "Course approved" : "Course rejected", course: updatedCourse });
+    // ── Notify other admins ───────────────────────────────────
+    const otherAdmins = await prisma.user.findMany({
+      where: { role: "ADMIN", NOT: { id: req.user.id } },
+    });
+    for (const admin of otherAdmins) {
+      await notify({
+        userId:  admin.id,
+        title:   approve ? "✅ Course Published" : "🚫 Course Rejected",
+        message: `Admin ${req.user.fullName || "an admin"} ${approve ? "approved" : "rejected"} "${course.title}" by ${course.instructor?.fullName || "unknown"}.`,
+        type:    "GENERAL",
+      });
+    }
+
+    // ── If approved: notify already-enrolled students ─────────
+    if (approve) {
+      const enrollments = await prisma.enrollment.findMany({ where: { courseId } });
+      for (const e of enrollments) {
+        await notify({
+          userId:  e.userId,
+          title:   "📚 Enrolled Course Now Published",
+          message: `"${course.title}" is now live and ready to learn!`,
+          type:    "GENERAL",
+        });
+      }
+    }
+
+    res.status(200).json({
+      message: approve ? "Course approved" : "Course rejected",
+      course:  updatedCourse,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to review course" });
@@ -245,11 +262,31 @@ exports.reviewCourse = async (req, res) => {
 exports.editCourse = async (req, res) => {
   try {
     if (!adminOnly(req, res)) return;
+
+    const existing = await prisma.course.findUnique({
+      where: { id: req.params.id },
+    });
+    if (!existing) return res.status(404).json({ message: "Course not found" });
+
     const { title, description, price, categoryId, thumbnail } = req.body;
+
     const course = await prisma.course.update({
       where: { id: req.params.id },
-      data: { title, description, price: price ? Number(price) : undefined, categoryId, thumbnail },
+      data:  {
+        title, description,
+        price:      price ? Number(price) : undefined,
+        categoryId, thumbnail,
+      },
     });
+
+    // ── Notify instructor their course was edited ─────────────
+    await notify({
+      userId:  existing.instructorId,
+      title:   "✏️ Course Updated by Admin",
+      message: `An admin updated details on your course "${existing.title}".`,
+      type:    "GENERAL",
+    });
+
     res.status(200).json({ message: "Course updated", course });
   } catch (err) {
     console.error(err);
@@ -261,7 +298,20 @@ exports.editCourse = async (req, res) => {
 exports.deleteCourse = async (req, res) => {
   try {
     if (!adminOnly(req, res)) return;
+
+    const course = await prisma.course.findUnique({ where: { id: req.params.id } });
+    if (!course) return res.status(404).json({ message: "Course not found" });
+
     await prisma.course.delete({ where: { id: req.params.id } });
+
+    // ── Notify instructor ─────────────────────────────────────
+    await notify({
+      userId:  course.instructorId,
+      title:   "⚠️ Course Removed",
+      message: `Your course "${course.title}" has been removed from the platform by an admin. Please contact support if you have questions.`,
+      type:    "GENERAL",
+    });
+
     res.status(200).json({ message: "Course deleted" });
   } catch (err) {
     console.error(err);
@@ -288,11 +338,16 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-// ===================== DELETE USER =====================
+// ===================== DELETE USER (Admin) =====================
 exports.deleteUser = async (req, res) => {
   try {
     if (!adminOnly(req, res)) return;
+
+    const userToDelete = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!userToDelete) return res.status(404).json({ message: "User not found" });
+
     await prisma.user.delete({ where: { id: req.params.id } });
+
     res.status(200).json({ message: "User deleted" });
   } catch (err) {
     console.error(err);
