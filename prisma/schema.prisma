@@ -48,11 +48,15 @@ enum LessonType {
 
 enum NotificationType {
   ENROLLMENT
+  PAYMENT
   COURSE_PUBLISHED
+  COURSE_APPROVED
   COURSE_REJECTED
+  COURSE_COMPLETED
   NEW_LESSON
   QUIZ_RESULT
   ACCOUNT
+  GENERAL
 }
 
 // ================================
@@ -63,7 +67,6 @@ model User {
   email    String @unique
   password String
 
-  // Profile
   fullName  String
   bio       String?
   avatarUrl String?
@@ -72,24 +75,20 @@ model User {
   role   Role
   status AccountStatus @default(ACTIVE)
 
-  // ✅ EMAIL VERIFICATION
   isEmailVerified        Boolean   @default(false)
-  emailVerificationToken String? // <-- add this
+  emailVerificationToken String?
   emailVerifyExpires     DateTime?
 
   resetPasswordToken   String?
   resetPasswordExpires DateTime?
 
-  // Instructor-only
   expertise            String?
   yearsExperience      Int?
   isInstructorApproved Boolean @default(false)
 
-  // Student-only
   learningGoal String?
   level        StudentLevel?
 
-  // Relations
   courses         Course[]       @relation("InstructorCourses")
   approvedCourses Course[]       @relation("AdminApprovedCourses")
   enrollments     Enrollment[]
@@ -127,7 +126,6 @@ model Course {
   instructorId String
   instructor   User   @relation("InstructorCourses", fields: [instructorId], references: [id], onDelete: Cascade)
 
-  // Admin approval
   approvedById    String?
   approvedBy      User?     @relation("AdminApprovedCourses", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedAt      DateTime?
@@ -325,6 +323,9 @@ model Notification {
   createdAt DateTime @default(now())
 }
 
+// ================================
+// CART
+// ================================
 model Cart {
   id        String     @id @default(uuid())
   userId    String     @unique
