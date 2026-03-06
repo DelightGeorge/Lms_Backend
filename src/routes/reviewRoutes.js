@@ -2,7 +2,7 @@
 const express    = require("express");
 const router     = express.Router();
 const ctrl       = require("../controllers/reviewController");
-const { protect } = require("../middleware/authMiddleware");
+const protect = require("../middlewares/auth");
 
 router.post("/",                    protect, ctrl.createReview);
 router.get("/course/:courseId",             ctrl.getReviewsByCourse);   // public
