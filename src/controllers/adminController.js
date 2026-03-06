@@ -299,10 +299,59 @@ exports.deleteCourse = async (req, res) => {
   try {
     if (!adminOnly(req, res)) return;
 
-    const course = await prisma.course.findUnique({ where: { id: req.params.id } });
+    const courseId = req.params.id;
+
+    const course = await prisma.course.findUnique({ where: { id: courseId } });
     if (!course) return res.status(404).json({ message: "Course not found" });
 
-    await prisma.course.delete({ where: { id: req.params.id } });
+    // Delete all related records in dependency order so foreign key
+    // constraints are never violated.  Order matters:
+    //   quiz attempts → quiz options → quiz questions → quizzes
+    //   lesson progress → lessons
+    //   resources, reviews, enrollments, notifications
+    //   then the course itself
+
+    // 1. Quiz attempts (reference quizzes)
+    const quizzes = await prisma.quiz.findMany({
+      where:  { courseId },
+      select: { id: true },
+    });
+    const quizIds = quizzes.map((q) => q.id);
+
+    if (quizIds.length > 0) {
+      await prisma.quizAttempt.deleteMany({ where: { quizId: { in: quizIds } } });
+
+      // Quiz answer options (reference questions)
+      const questions = await prisma.quizQuestion.findMany({
+        where:  { quizId: { in: quizIds } },
+        select: { id: true },
+      });
+      const questionIds = questions.map((q) => q.id);
+      if (questionIds.length > 0) {
+        await prisma.quizOption.deleteMany({ where: { questionId: { in: questionIds } } });
+      }
+      await prisma.quizQuestion.deleteMany({ where: { quizId: { in: quizIds } } });
+      await prisma.quiz.deleteMany({ where: { courseId } });
+    }
+
+    // 2. Lesson progress (references lessons)
+    const lessons = await prisma.lesson.findMany({
+      where:  { courseId },
+      select: { id: true },
+    });
+    const lessonIds = lessons.map((l) => l.id);
+    if (lessonIds.length > 0) {
+      await prisma.lessonProgress.deleteMany({ where: { lessonId: { in: lessonIds } } });
+      await prisma.lesson.deleteMany({ where: { courseId } });
+    }
+
+    // 3. Resources, reviews, enrollments, notifications about this course
+    await prisma.resource.deleteMany({ where: { courseId } });
+    await prisma.review.deleteMany({ where: { courseId } });
+    await prisma.enrollment.deleteMany({ where: { courseId } });
+
+    // 4. Finally delete the course
+    await prisma.course.delete({ where: { id: courseId } });
 
     // ── Notify instructor ─────────────────────────────────────
     await notify({

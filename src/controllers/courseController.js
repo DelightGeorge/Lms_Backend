@@ -120,6 +120,37 @@ exports.deleteCourse = async (req, res) => {
       return res.status(403).json({ message: "Not allowed to delete this course" });
     }
 
+    // Must delete related records in dependency order before deleting the course
+    // to avoid foreign key constraint violations.
+
+    // 1. Quiz attempts → options → questions → quizzes
+    const quizzes = await prisma.quiz.findMany({ where: { courseId }, select: { id: true } });
+    const quizIds = quizzes.map((q) => q.id);
+    if (quizIds.length > 0) {
+      await prisma.quizAttempt.deleteMany({ where: { quizId: { in: quizIds } } });
+      const questions = await prisma.quizQuestion.findMany({ where: { quizId: { in: quizIds } }, select: { id: true } });
+      const questionIds = questions.map((q) => q.id);
+      if (questionIds.length > 0) {
+        await prisma.quizOption.deleteMany({ where: { questionId: { in: questionIds } } });
+      }
+      await prisma.quizQuestion.deleteMany({ where: { quizId: { in: quizIds } } });
+      await prisma.quiz.deleteMany({ where: { courseId } });
+    }
+
+    // 2. Lesson progress → lessons
+    const lessons = await prisma.lesson.findMany({ where: { courseId }, select: { id: true } });
+    const lessonIds = lessons.map((l) => l.id);
+    if (lessonIds.length > 0) {
+      await prisma.lessonProgress.deleteMany({ where: { lessonId: { in: lessonIds } } });
+      await prisma.lesson.deleteMany({ where: { courseId } });
+    }
+
+    // 3. Resources, reviews, enrollments
+    await prisma.resource.deleteMany({ where: { courseId } });
+    await prisma.review.deleteMany({ where: { courseId } });
+    await prisma.enrollment.deleteMany({ where: { courseId } });
+
+    // 4. Delete the course
     await prisma.course.delete({ where: { id: courseId } });
 
     res.status(200).json({ message: "Course deleted" });
