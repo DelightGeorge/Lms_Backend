@@ -297,7 +297,6 @@ model Review {
   course Course @relation(fields: [courseId], references: [id])
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
   @@unique([userId, courseId])
 }
