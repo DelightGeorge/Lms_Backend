@@ -57,6 +57,34 @@ enum NotificationType {
   QUIZ_RESULT
   ACCOUNT
   GENERAL
+  REVIEW
+  PAYMENT_RECEIVED
+  PAYOUT_REQUESTED
+  PAYOUT_APPROVED
+  PAYOUT_REJECTED
+  REFUND
+}
+
+// NEW: How the student arrived at the course
+enum SaleSource {
+  PLATFORM    // browsed / searched marketplace  → instructor earns 37%
+  INSTRUCTOR  // instructor referral link/coupon → instructor earns 97%
+}
+
+// NEW: Lifecycle of a payment record
+enum PaymentStatus {
+  PENDING    // Paystack tx initialized but not yet confirmed
+  COMPLETED  // Paystack confirmed, enrollment created
+  REFUNDED   // Student refunded
+  FAILED     // Paystack failure
+}
+
+// NEW: Lifecycle of a payout request
+enum PayoutStatus {
+  PENDING   // Instructor submitted, awaiting admin action
+  APPROVED  // Admin approved, funds being processed
+  REJECTED  // Admin rejected
+  PAID      // Funds actually sent to instructor
 }
 
 // ================================
@@ -89,6 +117,7 @@ model User {
   learningGoal String?
   level        StudentLevel?
 
+  // Existing relations
   courses         Course[]       @relation("InstructorCourses")
   approvedCourses Course[]       @relation("AdminApprovedCourses")
   enrollments     Enrollment[]
@@ -97,9 +126,16 @@ model User {
   notifications   Notification[]
   reviews         Review[]
   notes           Note[]
+  cart            Cart?
+
+  // NEW payment relations
+  payments         Payment[]
+  wallet           InstructorWallet?
+  payoutRequests   PayoutRequest[]   @relation("InstructorPayouts")
+  processedPayouts PayoutRequest[]   @relation("ProcessedPayouts")
+  coupons          Coupon[]
 
   createdAt DateTime @default(now())
-  cart      Cart?
 }
 
 // ================================
@@ -140,9 +176,12 @@ model Course {
   reviews       Review[]
   announcements Announcement[]
   resources     Resource[]
+  cartItems     CartItem[]
 
-  createdAt DateTime   @default(now())
-  cartItems CartItem[]
+  // NEW
+  payments Payment[]
+
+  createdAt DateTime @default(now())
 }
 
 // ================================
@@ -205,10 +244,10 @@ model Quiz {
   courseId String
   course   Course @relation(fields: [courseId], references: [id])
 
-  questions Question[]
-
-  createdAt    DateTime      @default(now())
+  questions    Question[]
   quizAttempts QuizAttempt[]
+
+  createdAt DateTime @default(now())
 }
 
 model Question {
@@ -258,6 +297,7 @@ model Review {
   course Course @relation(fields: [courseId], references: [id])
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, courseId])
 }
@@ -344,4 +384,146 @@ model CartItem {
   course Course @relation(fields: [courseId], references: [id])
 
   @@unique([cartId, courseId])
+}
+
+// ================================
+// PAYMENT
+// One row per paid transaction.
+// Free enrollments bypass this entirely.
+// ================================
+model Payment {
+  id        String        @id @default(uuid())
+  reference String        @unique   // Paystack transaction reference
+
+  amount    Float                   // full price the student paid
+  status    PaymentStatus @default(PENDING)
+
+  userId   String
+  courseId String
+  user     User   @relation(fields: [userId], references: [id])
+  course   Course @relation(fields: [courseId], references: [id])
+
+  // Revenue split snapshot (stored so historical records are never affected
+  // if we change the rate policy in the future)
+  saleSource        SaleSource @default(PLATFORM)
+  platformFeeRate   Float      // 0.63 for PLATFORM, 0.03 for INSTRUCTOR
+  platformFee       Float      // dollar amount platform keeps
+  instructorEarning Float      // dollar amount instructor earns
+
+  // 30-day hold: earnings become spendable after this timestamp
+  availableAfter DateTime
+  releasedAt     DateTime?  // set by cron when moved to availableBalance
+
+  // Optional coupon code used during checkout
+  couponCode String?
+
+  // Refund metadata
+  refundedAt   DateTime?
+  refundReason String?
+
+  createdAt DateTime @default(now())
+
+  // One-to-one ledger entry
+  earningRecord InstructorEarning?
+}
+
+// ================================
+// INSTRUCTOR WALLET
+// One per instructor, auto-created on first sale.
+// ================================
+model InstructorWallet {
+  id String @id @default(uuid())
+
+  instructorId String @unique
+  instructor   User   @relation(fields: [instructorId], references: [id])
+
+  pendingBalance   Float @default(0)  // in 30-day hold
+  availableBalance Float @default(0)  // cleared, withdrawable
+  totalEarned      Float @default(0)  // lifetime (never decremented on payout)
+  totalPaidOut     Float @default(0)  // lifetime payouts sent
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  earnings       InstructorEarning[]
+  payoutRequests PayoutRequest[]
+}
+
+// ================================
+// INSTRUCTOR EARNING
+// Per-payment ledger row. Tracks the 30-day hold individually
+// so each sale can be released independently by the cron job.
+// ================================
+model InstructorEarning {
+  id String @id @default(uuid())
+
+  walletId String
+  wallet   InstructorWallet @relation(fields: [walletId], references: [id])
+
+  paymentId String  @unique
+  payment   Payment @relation(fields: [paymentId], references: [id])
+
+  amount         Float
+  saleSource     SaleSource
+  availableAfter DateTime   // copy from Payment — used by cron query
+
+  isReleased Boolean   @default(false)
+  releasedAt DateTime?
+
+  createdAt DateTime @default(now())
+}
+
+// ================================
+// PAYOUT REQUEST
+// Instructor requests a withdrawal; admin approves or rejects.
+// ================================
+model PayoutRequest {
+  id String @id @default(uuid())
+
+  walletId String
+  wallet   InstructorWallet @relation(fields: [walletId], references: [id])
+
+  instructorId String
+  instructor   User   @relation("InstructorPayouts", fields: [instructorId], references: [id])
+
+  amount Float
+  status PayoutStatus @default(PENDING)
+
+  // Instructor's bank / payout details submitted with the request
+  payoutMethod  String  @default("bank_transfer")
+  accountName   String?
+  accountNumber String?
+  bankName      String?
+  paypalEmail   String?
+
+  // Admin processing
+  processedById   String?
+  processedBy     User?    @relation("ProcessedPayouts", fields: [processedById], references: [id])
+  processedAt     DateTime?
+  adminNote       String?
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ================================
+// COUPON
+// Created by instructors. Using one during checkout sets
+// saleSource = INSTRUCTOR on the Payment row.
+// ================================
+model Coupon {
+  id   String @id @default(uuid())
+  code String @unique
+
+  instructorId String
+  instructor   User   @relation(fields: [instructorId], references: [id])
+
+  discountPct Float   @default(0)   // e.g. 10 = 10% off course price
+  isActive    Boolean @default(true)
+  usageCount  Int     @default(0)
+  maxUsage    Int?                  // null = unlimited
+
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
 }
