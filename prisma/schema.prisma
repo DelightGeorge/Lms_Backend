@@ -63,28 +63,31 @@ enum NotificationType {
   PAYOUT_APPROVED
   PAYOUT_REJECTED
   REFUND
+  INSTRUCTOR_REJECTED
+  INSTRUCTOR_APPROVED
+  INSTRUCTOR_APPLICATION
 }
 
 // NEW: How the student arrived at the course
 enum SaleSource {
-  PLATFORM    // browsed / searched marketplace  → instructor earns 37%
-  INSTRUCTOR  // instructor referral link/coupon → instructor earns 97%
+  PLATFORM // browsed / searched marketplace  → instructor earns 37%
+  INSTRUCTOR // instructor referral link/coupon → instructor earns 97%
 }
 
 // NEW: Lifecycle of a payment record
 enum PaymentStatus {
-  PENDING    // Paystack tx initialized but not yet confirmed
-  COMPLETED  // Paystack confirmed, enrollment created
-  REFUNDED   // Student refunded
-  FAILED     // Paystack failure
+  PENDING // Paystack tx initialized but not yet confirmed
+  COMPLETED // Paystack confirmed, enrollment created
+  REFUNDED // Student refunded
+  FAILED // Paystack failure
 }
 
 // NEW: Lifecycle of a payout request
 enum PayoutStatus {
-  PENDING   // Instructor submitted, awaiting admin action
-  APPROVED  // Admin approved, funds being processed
-  REJECTED  // Admin rejected
-  PAID      // Funds actually sent to instructor
+  PENDING // Instructor submitted, awaiting admin action
+  APPROVED // Admin approved, funds being processed
+  REJECTED // Admin rejected
+  PAID // Funds actually sent to instructor
 }
 
 // ================================
@@ -110,9 +113,11 @@ model User {
   resetPasswordToken   String?
   resetPasswordExpires DateTime?
 
-  expertise            String?
-  yearsExperience      Int?
-  isInstructorApproved Boolean @default(false)
+  expertise             String?
+  instructorApplication InstructorApplication?
+  reviewedApplications  InstructorApplication[] @relation("ApplicationReviewer")
+  yearsExperience       Int?
+  isInstructorApproved  Boolean                 @default(false)
 
   learningGoal String?
   level        StudentLevel?
@@ -391,11 +396,11 @@ model CartItem {
 // Free enrollments bypass this entirely.
 // ================================
 model Payment {
-  id        String        @id @default(uuid())
-  reference String        @unique   // Paystack transaction reference
+  id        String @id @default(uuid())
+  reference String @unique // Paystack transaction reference
 
-  amount    Float                   // full price the student paid
-  status    PaymentStatus @default(PENDING)
+  amount Float // full price the student paid
+  status PaymentStatus @default(PENDING)
 
   userId   String
   courseId String
@@ -405,13 +410,13 @@ model Payment {
   // Revenue split snapshot (stored so historical records are never affected
   // if we change the rate policy in the future)
   saleSource        SaleSource @default(PLATFORM)
-  platformFeeRate   Float      // 0.63 for PLATFORM, 0.03 for INSTRUCTOR
-  platformFee       Float      // dollar amount platform keeps
-  instructorEarning Float      // dollar amount instructor earns
+  platformFeeRate   Float // 0.63 for PLATFORM, 0.03 for INSTRUCTOR
+  platformFee       Float // dollar amount platform keeps
+  instructorEarning Float // dollar amount instructor earns
 
   // 30-day hold: earnings become spendable after this timestamp
   availableAfter DateTime
-  releasedAt     DateTime?  // set by cron when moved to availableBalance
+  releasedAt     DateTime? // set by cron when moved to availableBalance
 
   // Optional coupon code used during checkout
   couponCode String?
@@ -436,10 +441,10 @@ model InstructorWallet {
   instructorId String @unique
   instructor   User   @relation(fields: [instructorId], references: [id])
 
-  pendingBalance   Float @default(0)  // in 30-day hold
-  availableBalance Float @default(0)  // cleared, withdrawable
-  totalEarned      Float @default(0)  // lifetime (never decremented on payout)
-  totalPaidOut     Float @default(0)  // lifetime payouts sent
+  pendingBalance   Float @default(0) // in 30-day hold
+  availableBalance Float @default(0) // cleared, withdrawable
+  totalEarned      Float @default(0) // lifetime (never decremented on payout)
+  totalPaidOut     Float @default(0) // lifetime payouts sent
 
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
@@ -464,7 +469,7 @@ model InstructorEarning {
 
   amount         Float
   saleSource     SaleSource
-  availableAfter DateTime   // copy from Payment — used by cron query
+  availableAfter DateTime // copy from Payment — used by cron query
 
   isReleased Boolean   @default(false)
   releasedAt DateTime?
@@ -497,7 +502,7 @@ model PayoutRequest {
 
   // Admin processing
   processedById   String?
-  processedBy     User?    @relation("ProcessedPayouts", fields: [processedById], references: [id])
+  processedBy     User?     @relation("ProcessedPayouts", fields: [processedById], references: [id])
   processedAt     DateTime?
   adminNote       String?
   rejectionReason String?
@@ -518,11 +523,48 @@ model Coupon {
   instructorId String
   instructor   User   @relation(fields: [instructorId], references: [id])
 
-  discountPct Float   @default(0)   // e.g. 10 = 10% off course price
+  discountPct Float   @default(0) // e.g. 10 = 10% off course price
   isActive    Boolean @default(true)
   usageCount  Int     @default(0)
-  maxUsage    Int?                  // null = unlimited
+  maxUsage    Int? // null = unlimited
 
   expiresAt DateTime?
   createdAt DateTime  @default(now())
+}
+
+enum InstructorAppStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model InstructorApplication {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Professional info
+  headline        String // e.g. "Senior React Developer @ Google"
+  expertise       String // Subject area: "Web Development, JavaScript"
+  yearsExperience Int
+  bio             String // Teaching philosophy / about
+
+  // Documents (URLs — use Cloudinary / S3 / any upload service)
+  idDocumentUrl  String // Government-issued ID
+  cvUrl          String // CV / Resume
+  portfolioUrl   String? // Optional: LinkedIn, GitHub, personal site
+  sampleVideoUrl String? // Optional: short intro or sample lesson
+
+  // Why do you want to teach on this platform?
+  teachingMotivation String
+
+  status InstructorAppStatus @default(PENDING)
+
+  reviewedById    String?
+  reviewedBy      User?     @relation("ApplicationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

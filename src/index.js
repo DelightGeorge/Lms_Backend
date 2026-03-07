@@ -20,6 +20,7 @@ const progressRoutes = require("./routes/progressRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const walletRoutes = require("./routes/walletRoutes");
 const couponRoutes = require("./routes/couponRoutes");
+const instructorApplicationRoutes = require("./routes/instructorApplicationRoutes");
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use("/api/progress", progressRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/wallets", walletRoutes);
 app.use("/api/coupons", couponRoutes);
+app.use("/api/instructor-applications", require("./routes/instructorApplicationRoutes"));
 
 app.get("/", (req, res) =>
   res.json({ status: "OK", message: "LMS Backend is Live 🚀" }),
