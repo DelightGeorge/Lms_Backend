@@ -63,9 +63,6 @@ enum NotificationType {
   PAYOUT_APPROVED
   PAYOUT_REJECTED
   REFUND
-  INSTRUCTOR_REJECTED
-  INSTRUCTOR_APPROVED
-  INSTRUCTOR_APPLICATION
 }
 
 // NEW: How the student arrived at the course
@@ -140,6 +137,10 @@ model User {
   processedPayouts PayoutRequest[]   @relation("ProcessedPayouts")
   coupons          Coupon[]
 
+  // Lesson discussion
+  lessonComments     LessonComment[]     @relation("UserComments")
+  lessonCommentLikes LessonCommentLike[]
+
   createdAt DateTime @default(now())
 }
 
@@ -204,6 +205,7 @@ model Lesson {
 
   progress Progress[]
   notes    Note[]
+  comments LessonComment[]
 
   createdAt DateTime @default(now())
 }
@@ -532,6 +534,9 @@ model Coupon {
   createdAt DateTime  @default(now())
 }
 
+// ================================
+// INSTRUCTOR APPLICATION
+// ================================
 enum InstructorAppStatus {
   PENDING
   APPROVED
@@ -543,19 +548,16 @@ model InstructorApplication {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Professional info
-  headline        String // e.g. "Senior React Developer @ Google"
-  expertise       String // Subject area: "Web Development, JavaScript"
+  headline        String
+  expertise       String
   yearsExperience Int
-  bio             String // Teaching philosophy / about
+  bio             String
 
-  // Documents (URLs — use Cloudinary / S3 / any upload service)
-  idDocumentUrl  String // Government-issued ID
-  cvUrl          String // CV / Resume
-  portfolioUrl   String? // Optional: LinkedIn, GitHub, personal site
-  sampleVideoUrl String? // Optional: short intro or sample lesson
+  idDocumentUrl  String
+  cvUrl          String
+  portfolioUrl   String?
+  sampleVideoUrl String?
 
-  // Why do you want to teach on this platform?
   teachingMotivation String
 
   status InstructorAppStatus @default(PENDING)
@@ -567,4 +569,38 @@ model InstructorApplication {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ================================
+// LESSON COMMENTS & LIKES
+// ================================
+model LessonComment {
+  id       String  @id @default(uuid())
+  content  String
+  isEdited Boolean @default(false)
+
+  userId   String
+  lessonId String
+  parentId String?
+
+  user    User                @relation("UserComments", fields: [userId], references: [id], onDelete: Cascade)
+  lesson  Lesson              @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  parent  LessonComment?      @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies LessonComment[]     @relation("Replies")
+  likes   LessonCommentLike[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LessonCommentLike {
+  userId    String
+  commentId String
+
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment LessonComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, commentId])
 }
