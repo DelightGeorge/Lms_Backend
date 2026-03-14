@@ -15,27 +15,43 @@ exports.getMyWallet = async (req, res) => {
   try {
     if (req.user.role !== "INSTRUCTOR") return res.status(403).json({ message: "Instructors only" });
 
-    // getOrCreateWallet so instructors always see a wallet even before first sale
-    const wallet = await revenueService.getOrCreateWallet(req.user.id);
+    const MIN_PAYOUT = 25;
 
-    // Recent earnings (last 20)
-    const earnings = await prisma.instructorEarning.findMany({
-      where:   { walletId: wallet.id },
-      include: {
-        payment: {
-          include: { course: { select: { id: true, title: true } } },
+    // Upsert wallet directly — no revenueService dependency
+    const wallet = await prisma.instructorWallet.upsert({
+      where:  { instructorId: req.user.id },
+      create: { instructorId: req.user.id },
+      update: {},
+    });
+
+    // Recent earnings — catch gracefully if table doesn't exist yet
+    let earnings = [];
+    try {
+      earnings = await prisma.instructorEarning.findMany({
+        where:   { walletId: wallet.id },
+        include: {
+          payment: {
+            include: { course: { select: { id: true, title: true } } },
+          },
         },
-      },
-      orderBy: { createdAt: "desc" },
-      take:    20,
-    });
+        orderBy: { createdAt: "desc" },
+        take:    20,
+      });
+    } catch (e) {
+      console.warn("[wallet] Could not fetch earnings:", e.message);
+    }
 
-    // Active payout requests
-    const payoutRequests = await prisma.payoutRequest.findMany({
-      where:   { instructorId: req.user.id },
-      orderBy: { createdAt: "desc" },
-      take:    10,
-    });
+    // Payout requests
+    let payoutRequests = [];
+    try {
+      payoutRequests = await prisma.payoutRequest.findMany({
+        where:   { instructorId: req.user.id },
+        orderBy: { createdAt: "desc" },
+        take:    10,
+      });
+    } catch (e) {
+      console.warn("[wallet] Could not fetch payout requests:", e.message);
+    }
 
     res.status(200).json({
       wallet: {
@@ -43,15 +59,15 @@ exports.getMyWallet = async (req, res) => {
         availableBalance: wallet.availableBalance,
         totalEarned:      wallet.totalEarned,
         totalPaidOut:     wallet.totalPaidOut,
-        canRequestPayout: wallet.availableBalance >= revenueService.MIN_PAYOUT,
-        minPayout:        revenueService.MIN_PAYOUT,
+        canRequestPayout: wallet.availableBalance >= MIN_PAYOUT,
+        minPayout:        MIN_PAYOUT,
       },
       earnings,
       payoutRequests,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Failed to fetch wallet" });
+    console.error("[wallet] getMyWallet error:", err);
+    res.status(500).json({ message: err.message || "Failed to fetch wallet" });
   }
 };
 
