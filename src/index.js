@@ -1,26 +1,26 @@
 const express = require("express");
-const cors    = require("cors");
+const cors = require("cors");
 require("dotenv").config();
 
 const prisma = require("./prisma");
 
-const courseRoutes                  = require("./routes/courseRoutes");
-const authRoutes                    = require("./routes/authRoutes");
-const userRoutes                    = require("./routes/userRoutes");
-const categoryRoutes                = require("./routes/categoryRoutes");
-const adminRoutes                   = require("./routes/adminRoutes");
-const notificationRoutes            = require("./routes/notificationRoutes");
-const lessonRoutes                  = require("./routes/lessonRoutes");
-const quizRoutes                    = require("./routes/quizRoutes");
-const reviewRoutes                  = require("./routes/reviewRoutes");
-const resourceRoutes                = require("./routes/resourceRoutes");
-const cartRoutes                    = require("./routes/cartRoutes");
-const enrollmentRoutes              = require("./routes/enrollmentRoutes");
-const progressRoutes                = require("./routes/progressRoutes");
-const paymentRoutes                 = require("./routes/paymentRoutes");
-const walletRoutes                  = require("./routes/walletRoutes");
-const couponRoutes                  = require("./routes/couponRoutes");
-const instructorApplicationRoutes   = require("./routes/instructorApplicationRoutes");
+const courseRoutes = require("./routes/courseRoutes");
+const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const lessonRoutes = require("./routes/lessonRoutes");
+const quizRoutes = require("./routes/quizRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
+const resourceRoutes = require("./routes/resourceRoutes");
+const cartRoutes = require("./routes/cartRoutes");
+const enrollmentRoutes = require("./routes/enrollmentRoutes");
+const progressRoutes = require("./routes/progressRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
+const walletRoutes = require("./routes/walletRoutes");
+const couponRoutes = require("./routes/couponRoutes");
+const instructorApplicationRoutes = require("./routes/instructorApplicationRoutes");
 
 const app = express();
 
@@ -41,26 +41,26 @@ app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/api/courses",                  courseRoutes);
-app.use("/api/auth",                     authRoutes);
-app.use("/api/users",                    userRoutes);
-app.use("/api/categories",               categoryRoutes);
-app.use("/api/admin",                    adminRoutes);
-app.use("/api/notifications",            notificationRoutes);
-app.use("/api/lessons",                  lessonRoutes);
-app.use("/api/quizzes",                  quizRoutes);
-app.use("/api/reviews",                  reviewRoutes);
-app.use("/api/resources",                resourceRoutes);
-app.use("/api/cart",                     cartRoutes);
-app.use("/api/enrollments",              enrollmentRoutes);
-app.use("/api/progress",                 progressRoutes);
-app.use("/api/payments",                 paymentRoutes);
-app.use("/api/wallet",                   walletRoutes);   // ← fixed: was /api/wallets
-app.use("/api/coupons",                  couponRoutes);
-app.use("/api/instructor-applications",  instructorApplicationRoutes);
+app.use("/api/courses", courseRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/lessons", lessonRoutes);
+app.use("/api/quizzes", quizRoutes);
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/resources", resourceRoutes);
+app.use("/api/cart", cartRoutes);
+app.use("/api/enrollments", enrollmentRoutes);
+app.use("/api/progress", progressRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/coupons", couponRoutes);
+app.use("/api/instructor-applications", instructorApplicationRoutes);
+app.use("/api/wallet", walletRoutes); // was /api/wallets
 
 app.get("/", (req, res) =>
-  res.json({ status: "OK", message: "LMS Backend is Live 🚀" })
+  res.json({ status: "OK", message: "LMS Backend is Live 🚀" }),
 );
 
 app.get("/test-db", async (req, res) => {
