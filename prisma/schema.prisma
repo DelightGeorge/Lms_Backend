@@ -2,8 +2,7 @@
 // Prisma Client Generator
 // ================================
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
 }
 
 // ================================
