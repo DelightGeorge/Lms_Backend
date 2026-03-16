@@ -14,7 +14,7 @@ const RATES = {
   INSTRUCTOR: { instructorShare: 0.97, platformShare: 0.03 },
 };
 
-const HOLD_DAYS  = 30;   // days before earnings move to availableBalance
+const HOLD_DAYS = 0;  // days before earnings move to availableBalance
 const MIN_PAYOUT = 25;   // minimum availableBalance required to request a payout
 
 // ─────────────────────────────────────────────────────────────────────────────
