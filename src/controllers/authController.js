@@ -51,9 +51,17 @@ exports.register = async (req, res) => {
       },
     });
 
-    // ── send verification email ──────────────────────────────────────────────
+    // ── send verification email (non-blocking — user is already saved) ────────
+    // If email fails we still return success. The user can resend from the
+    // "resend-verification" endpoint. This prevents a nodemailer timeout from
+    // blocking registration.
     const verifyLink = `${process.env.BACKEND_URL}/api/auth/verify-email/${verificationToken}`;
-    await sendEmail(email, "Verify Your Email", verificationEmail(fullName.trim(), verifyLink));
+    try {
+      await sendEmail(email, "Verify Your Email", verificationEmail(fullName.trim(), verifyLink));
+    } catch (emailErr) {
+      // Log for ops visibility but DO NOT fail the request
+      console.error("REGISTER — verification email failed to send:", emailErr.message);
+    }
 
     return res.status(201).json({
       message: "Registration successful. Check your email to verify your account.",
@@ -125,7 +133,12 @@ exports.resendVerification = async (req, res) => {
     });
 
     const verifyLink = `${process.env.BACKEND_URL}/api/auth/verify-email/${verificationToken}`;
-    await sendEmail(email, "Verify Your Email", verificationEmail(user.fullName, verifyLink));
+    try {
+      await sendEmail(email, "Verify Your Email", verificationEmail(user.fullName, verifyLink));
+    } catch (emailErr) {
+      console.error("RESEND VERIFICATION — email send failed:", emailErr.message);
+      // Still return success — token is saved, user can try again
+    }
 
     return res.status(200).json({ message: GENERIC_RESEND_MSG });
   } catch (err) {
